@@ -253,6 +253,8 @@ class Window(tk.Tk):
                     try:
                         clean_name = clean_name(member.name)
                         full_path = os.path.join(save_folder, Path(clean_name))
+                        print(f'clean_name: {clean_name}')
+                        print(f'full_path: {full_path}')
                         if member.isdir():
                             os.makedirs(full_path, exist_ok=True)
                         else:
@@ -327,6 +329,8 @@ class Window(tk.Tk):
                         operating_system = 'iOS'
                         duong_dan = dd
                         break
+                    else:
+                        operating_system = f'không xác định'
             if duong_dan == '':
                 ms.showwarning('Warning', 'Không tìm thấy dữ liệu ứng dụng Zalo \U0001F605 \U0001F605 \U0001F605')
 
