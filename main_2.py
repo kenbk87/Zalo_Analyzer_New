@@ -1,3 +1,4 @@
+import re
 import tarfile
 import tkinter as tk
 import zipfile
@@ -5,10 +6,14 @@ from tkinter import filedialog as fd
 from tkinter import messagebox as ms
 from tkinter import ttk
 from tkinter import scrolledtext
+# pip install tkinter-tooltip: create tooltip for widget
 from tktooltip import ToolTip
 from zipfile import ZipFile
 
 from pandastable import Table
+from pathlib import Path
+from functools import lru_cache
+import fnmatch
 
 from Path_Zalo_iOS import Zalo_iOS
 from Extract_Zalo_iOS import Analysis_Zalo_iOS
@@ -122,7 +127,7 @@ class Window(tk.Tk):
         self.lb_status = ttk.Label(self.status_frame)
         self.lb_status.grid(row=1, column=0, padx=5, pady=5, sticky='e')
 
-        self.progress_bar = ttk.Progressbar(self.status_frame, length=1100)
+        self.progress_bar = ttk.Progressbar(self.status_frame, length=1280)
         self.progress_bar.grid(row=2, column=0, padx=5, pady=5, sticky='ew')
         ################################################################################################################
         # Create a export frame:
@@ -210,6 +215,12 @@ class Window(tk.Tk):
         thread_2 = Thread(target=self.scan_image_folder)
         thread_2.start()
 
+    def clean_path(filename, replacement_char='_'):
+        """
+        Removes illegal characters (for windows) from the string passed. Does not replace \ or /
+        """
+        return re.sub(r'[*?:"<>|\'\r\n]', replacement_char, filename)
+
     def unzip(self):
         """
             1. Unzip a zip file with zipfile library
@@ -229,24 +240,42 @@ class Window(tk.Tk):
                         self.lb_status.config(text=f'{percent}%')
                         self.progress_bar['value'] = percent
                         zip_file.extract(files, save_folder)
-                        self.entry_log.insert(tk.END, f'- Extracting: {os.path.basename(files)}...\n')
+                        self.entry_log.insert(tk.END, f'- Extracting: {files} \n')
                 except zipfile.BadZipfile as e:
                     self.entry_log.insert(tk.END, f'- {e} \n')
             zip_file.close()
 
         elif tarfile.is_tarfile(file_name):
             self.entry_log.insert(tk.END, f'- Đã chọn file ảnh định dạng tar file: {os.path.basename(file_name)}\n')
+
             with tarfile.open(file_name) as Tar_file:
-                file_list = Tar_file.getmembers()
-                for idx, files in enumerate(file_list, 1):
-                    percent = round((idx / len(file_list)) * 100, 2)
-                    self.lb_status.config(text=f'{percent}%')
-                    self.progress_bar['value'] = percent
+                for member in Tar_file.getmembers():
                     try:
-                        Tar_file.extract(files, save_folder)
-                    except Exception as e:
-                        self.entry_log.insert(tk.END, f'- {e} \n')
-            Tar_file.close()
+                        clean_name = clean_name(member.name)
+                        full_path = os.path.join(save_folder, Path(clean_name))
+                        if member.isdir():
+                            os.makedirs(full_path, exist_ok=True)
+                        else:
+                            parent_dir = os.path.dirname(full_path)
+                            if not os.path.exists(parent_dir):
+                                os.makedirs(parent_dir)
+                            with open(full_path, "wb") as fout:
+                                fout.write(tarfile.ExFileObject(Tar_file, member).read())
+                                fout.close()
+                    except Exception as ex:
+                        print(f'Could not write file to filesystem, path was {member.name} ' + str(ex))
+
+            # with tarfile.open(file_name) as Tar_file:
+            #     file_list = Tar_file.getmembers()
+            #     for idx, files in enumerate(file_list, 1):
+            #         percent = round((idx / len(file_list)) * 100, 2)
+            #         self.lb_status.config(text=f'{percent}%')
+            #         self.progress_bar['value'] = percent
+            #         try:
+            #             print(os.path.join(save_folder, f'{files}'))
+            #         except Exception as e:
+            #             self.entry_log.insert(tk.END, f'- {e} \n')
+            # Tar_file.close()
         self.entry_log.insert(tk.INSERT, f'- Extract {os.path.basename(file_name)} done!!! \n')
         self.entry_log.see(tk.END)
 
@@ -304,13 +333,17 @@ class Window(tk.Tk):
             self.entry_log.insert(tk.END, f'- Điện thoại sử dụng hệ điều hành {operating_system} \n')
 
             if operating_system == 'android':
-                self.entry_log.insert(tk.END, f'- Đường dẫn zalo: {duong_dan} \n')
+                self.entry_log.insert(tk.END, f'- Đã tìm thấy ứng dung zalo tại: {duong_dan} \n')
                 self.db_analysic(duong_dan)
             elif operating_system == 'iOS':
                 global df_final_1
                 # Cắt lấy phần đầu của biến duong_dan:
                 dd1 = duong_dan.split('\\private')[0]
-                zalo_path = Zalo_iOS(duong_dan).scan_zalo_iOS()
+                try:
+                    self.entry_log.insert(tk.END, f'- Đang tìm ứng dụng Zalo \n')
+                    zalo_path = Zalo_iOS(duong_dan).scan_zalo_iOS()
+                except Exception as e:
+                    self.entry_log.insert(tk.END, f'- Lỗi: {e} \n')
 
                 # Đường dẫn đầy đủ chứa dữ liệu của Zalo:
                 path_full = dd1 + zalo_path
