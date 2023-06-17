@@ -258,7 +258,8 @@ class Window(tk.Tk):
                     self.lb_status.config(text=f'{percent}%')
                     self.progress_bar['value'] = percent
                     try:
-                        # files.name = self.clean_path(files.name)
+                        temp_name = self.clean_path(files.name)
+                        files.name = temp_name
                         files.name = files.name[1:]
                         Tar_file.extract(files, save_folder)
 
