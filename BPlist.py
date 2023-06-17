@@ -23,5 +23,5 @@ class BPlist_Parse:
             except (nd.DeserializeError, nd.biplist.NotBinaryPlistException, nd.biplist.InvalidPlistException,
                     nd.plistlib.InvalidFileException, nd.ccl_bplist.BplistError, ValueError, TypeError, OSError,
                     OverflowError) as ex:
-                logfunc(f'Failed to read plist for {self.bplist}, error was:' + str(ex))
+                print(f'Failed to read plist for {self.bplist}, error was:' + str(ex))
         return plist

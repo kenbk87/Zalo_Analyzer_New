@@ -11,15 +11,15 @@ from tktooltip import ToolTip
 from zipfile import ZipFile
 
 from pandastable import Table
-from pathlib import Path
-from functools import lru_cache
-import fnmatch
+
 
 from Path_Zalo_iOS import Zalo_iOS
 from Extract_Zalo_iOS import Analysis_Zalo_iOS
 from Extract_From_ZaloDB import *
 from Scan_DB_Files import Scan_DB_files
+
 import webbrowser
+from mailmerge import MailMerge
 
 from threading import Thread
 import pandas as pd
@@ -146,10 +146,13 @@ class Window(tk.Tk):
         self.radiobutton_csv.grid(row=0, column=2, padx=5, pady=5, sticky='ew')
 
         self.btn_export = ttk.Button(self.export_frame, text='Export', command=self.trich_xuat)
-        self.btn_export.grid(row=0, column=3, pady=5, padx=50, columnspan=3, sticky='ew')
+        self.btn_export.grid(row=0, column=3, pady=5, padx=5, sticky='ew')
 
         self.btn_view = ttk.Button(self.export_frame, text='Open', command=self.xem)
-        self.btn_view.grid(row=1, column=3, pady=5, padx=50, columnspan=3, sticky='ew')
+        self.btn_view.grid(row=1, column=3, pady=5, padx=5, sticky='ew')
+
+        self.btn_report = ttk.Button(self.export_frame, text='Create a Report', command=self.create_report)
+        self.btn_report.grid(row=1, column=0, columnspan=2, pady=5, padx=5, sticky='ew')
         ################################################################################################################
         # Create a log frame:
         self.log_frame = ttk.LabelFrame(frame, text='Log:')
@@ -167,6 +170,8 @@ class Window(tk.Tk):
         ToolTip(self.button_folder_analysis, 'With a folder contain file after unzip: \n'
                                              '1. Select folder \n'
                                              '2. Click this button to analysis')
+
+        ToolTip(self.btn_report, 'Create a .Docx report..!')
 
     def toggle_mode(self):
         """
@@ -215,16 +220,16 @@ class Window(tk.Tk):
         thread_2 = Thread(target=self.scan_image_folder)
         thread_2.start()
 
-    def clean_path(filename, replacement_char='_'):
+    def clean_path(self, filename, replacement_char='_'):
         """
-        Removes illegal characters (for windows) from the string passed. Does not replace \ or /
+        Removes illegal characters (for windows) from the string passed.
         """
         return re.sub(r'[*?:"<>|\'\r\n]', replacement_char, filename)
 
     def unzip(self):
         """
             1. Unzip a zip file with zipfile library
-            2. Unzip a tar file with
+            2. Unzip a tar file with tarfile library
         """
         file_name = self.entry_file_selected.get().strip()
         file_name = '\\\\?\\' + file_name.replace('/', '\\')
@@ -246,38 +251,20 @@ class Window(tk.Tk):
             zip_file.close()
 
         elif tarfile.is_tarfile(file_name):
-            self.entry_log.insert(tk.END, f'- Đã chọn file ảnh định dạng tar file: {os.path.basename(file_name)}\n')
-
             with tarfile.open(file_name) as Tar_file:
-                for member in Tar_file.getmembers():
+                file_list = Tar_file.getmembers()
+                for idx, files in enumerate(file_list, 1):
+                    percent = round((idx / len(file_list)) * 100, 2)
+                    self.lb_status.config(text=f'{percent}%')
+                    self.progress_bar['value'] = percent
                     try:
-                        clean_name = clean_name(member.name)
-                        full_path = os.path.join(save_folder, Path(clean_name))
-                        print(f'clean_name: {clean_name}')
-                        print(f'full_path: {full_path}')
-                        if member.isdir():
-                            os.makedirs(full_path, exist_ok=True)
-                        else:
-                            parent_dir = os.path.dirname(full_path)
-                            if not os.path.exists(parent_dir):
-                                os.makedirs(parent_dir)
-                            with open(full_path, "wb") as fout:
-                                fout.write(tarfile.ExFileObject(Tar_file, member).read())
-                                fout.close()
-                    except Exception as ex:
-                        print(f'Could not write file to filesystem, path was {member.name} ' + str(ex))
+                        # files.name = self.clean_path(files.name)
+                        files.name = files.name[1:]
+                        Tar_file.extract(files, save_folder)
 
-            # with tarfile.open(file_name) as Tar_file:
-            #     file_list = Tar_file.getmembers()
-            #     for idx, files in enumerate(file_list, 1):
-            #         percent = round((idx / len(file_list)) * 100, 2)
-            #         self.lb_status.config(text=f'{percent}%')
-            #         self.progress_bar['value'] = percent
-            #         try:
-            #             print(os.path.join(save_folder, f'{files}'))
-            #         except Exception as e:
-            #             self.entry_log.insert(tk.END, f'- {e} \n')
-            # Tar_file.close()
+                    except Exception as e:
+                        self.entry_log.insert(tk.END, f'- {e} \n')
+            Tar_file.close()
         self.entry_log.insert(tk.INSERT, f'- Extract {os.path.basename(file_name)} done!!! \n')
         self.entry_log.see(tk.END)
 
@@ -324,14 +311,15 @@ class Window(tk.Tk):
                         duong_dan = dd
                         operating_system = 'android'
                         self.entry_log.insert(tk.END, f'- Đã tìm thấy dữ liệu ứng dụng Zalo \n')
+                        self.entry_log.insert(tk.END, f'- Đang phân tich... \n')
                         break
                     elif dd.endswith(DIR_iOS):
                         operating_system = 'iOS'
                         duong_dan = dd
                         break
-                    else:
-                        operating_system = f'không xác định'
+
             if duong_dan == '':
+                self.entry_log.insert(tk.END, f'- Điện thoại sử dụng hệ điều hành không xác định')
                 ms.showwarning('Warning', 'Không tìm thấy dữ liệu ứng dụng Zalo \U0001F605 \U0001F605 \U0001F605')
 
             self.entry_log.insert(tk.END, f'- Điện thoại sử dụng hệ điều hành {operating_system} \n')
@@ -344,8 +332,14 @@ class Window(tk.Tk):
                 # Cắt lấy phần đầu của biến duong_dan:
                 dd1 = duong_dan.split('\\private')[0]
                 try:
+                    zalo_path=''
                     self.entry_log.insert(tk.END, f'- Đang tìm ứng dụng Zalo \n')
                     zalo_path = Zalo_iOS(duong_dan).scan_zalo_iOS()
+                    if zalo_path=='':
+                        self.entry_log.insert(tk.END, f'- Đã tìm thấy dữ liệu ứng dụng Zalo \n')
+                    else:
+                        self.entry_log.insert(tk.END, f'- Đã tìm thấy dữ liệu ứng dụng Zalo \n')
+                        self.entry_log.insert(tk.END, f'- Đang phân tich... \n')
                 except Exception as e:
                     self.entry_log.insert(tk.END, f'- Lỗi: {e} \n')
 
@@ -367,7 +361,7 @@ class Window(tk.Tk):
                     print(e)
 
     def db_analysic(self, zalo_path):
-        global df_final_1, df_final_2
+        global df_final_1, df_final_2, number_of_zalo
         ZALO = 'zalo'
         FILE_BIN_1 = 'phone_contact_list_server_version.bin'
         FILE_BIN_2 = 'phonecontactlist.bin'
@@ -418,7 +412,7 @@ class Window(tk.Tk):
         elif number_of_zalo == 0:
             df_final_1 = self.get_data_no_db(contact_zalo, danh_ba[0])
             df_final_1.index = np.arange(1, len(df_final_1) + 1)
-            so_db = 0
+            so_db = 1
 
         try:
             self.display_data(df_final_1)
@@ -436,7 +430,7 @@ class Window(tk.Tk):
         # Tìm tên chủ tài khoản Zalo:
         df_thong_tin_chu_tk = df_contact.loc[df_contact['SenderId'] == int(id_owner_zalo)]
         zalo_name_owner = df_thong_tin_chu_tk.iat[0, 1]
-        self.zalo_owner_name.config(text=f'- Tài khoản: {zalo_name_owner}')
+        self.zalo_owner_name.config(text=f'{zalo_name_owner}')
         self.zalo_owner_id.config(text=id_owner_zalo)
         return int(id_owner_zalo)
 
@@ -699,6 +693,21 @@ class Window(tk.Tk):
 
     def xem(self):
         webbrowser.open(os.path.realpath(ten_folder))
+
+    def create_report(self):
+        """
+            Create a .docx report:
+        """
+        document = MailMerge('Report.docx')
+        id_chu_tk = self.zalo_owner_id.cget('text')
+        ten_chu_tk = self.zalo_owner_name.cget('text')
+        document.merge(
+            so_tk_zalo=f'{number_of_zalo}',
+            id_chu_tk=f'{id_chu_tk}',
+            ten_chu_tk=f'{ten_chu_tk}')
+
+        document.write('Test_output.docx')
+        ms.showwarning('Warning', 'Đã tạo báo cáo xong \U0001F605 \U0001F605 \U0001F605')
 
 
 if __name__ == '__main__':
