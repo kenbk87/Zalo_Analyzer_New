@@ -24,6 +24,7 @@ from mailmerge import MailMerge
 from threading import Thread
 import pandas as pd
 import os
+import shutil
 
 
 class Window(tk.Tk):
@@ -109,7 +110,7 @@ class Window(tk.Tk):
         self.info_3 = ttk.Label(self.info_frame, text='Zalo Owner Name: ')
         self.info_3.grid(row=2, column=0, padx=5, pady=5, sticky='w')
 
-        self.zalo_owner_name = ttk.Label(self.info_frame, text='                        ')
+        self.zalo_owner_name = ttk.Label(self.info_frame, text='', wraplength=100)
         self.zalo_owner_name.grid(row=2, column=1, padx=5, pady=5, sticky='w')
         ################################################################################################################
         # Create a frame to display data:
@@ -244,8 +245,12 @@ class Window(tk.Tk):
                         percent = round((idx / len(file_list)) * 100, 2)
                         self.lb_status.config(text=f'{percent}%')
                         self.progress_bar['value'] = percent
-                        zip_file.extract(files, save_folder)
-                        self.entry_log.insert(tk.END, f'- Extracting: {files} \n')
+                        try:
+                            zip_file.extract(files, save_folder)
+                            self.entry_log.insert(tk.END, f'- Extracting: {files} \n')
+                        except Exception as e:
+                            self.entry_log.insert(tk.END, f'- {e} \n')
+                            continue
                 except zipfile.BadZipfile as e:
                     self.entry_log.insert(tk.END, f'- {e} \n')
             zip_file.close()
@@ -258,9 +263,11 @@ class Window(tk.Tk):
                     self.lb_status.config(text=f'{percent}%')
                     self.progress_bar['value'] = percent
                     try:
+                        # Loại bỏ các file có tên chứa các ký tự đặc biệt không thể giải nén:
                         temp_name = self.clean_path(files.name)
-                        files.name = temp_name
-                        files.name = files.name[1:]
+
+                        # Loại bỏ ký tự "/" đầu tên file để các file giải nén đúng folder đã chọn:
+                        files.name = temp_name[1:]
                         Tar_file.extract(files, save_folder)
 
                     except Exception as e:
@@ -270,6 +277,11 @@ class Window(tk.Tk):
         self.entry_log.see(tk.END)
 
     def display_data(self, df):
+        """
+            1. Tải dữ liệu lên bảng pandastable
+            2. Tắt chế độ chỉnh sửa cho dữ liệu trong bảng
+        """
+        self.entry_log.insert(tk.END, f'- Đã phân tích xong. \n')
         self.pt.model.df = df
         self.pt.editable = False
         self.pt.font = 'Arial'
@@ -297,7 +309,7 @@ class Window(tk.Tk):
             self.scan_folder(folder_name)
 
     def scan_folder(self, folder_selected):
-        global df_danh_ba_tong
+        global df_danh_ba_tong, operating_system, duong_dan, media_path
         if folder_selected == '':
             ms.showwarning('Warning', 'Chưa chọn thư mục để lưu \U0001F606 \U0001F606 \U0001F606')
         else:
@@ -305,6 +317,7 @@ class Window(tk.Tk):
             # Chia làm 2 lần quét, quét thư mục com.zing.zalo trước
             for root, dirs, files in os.walk(folder_selected):
                 ZALO_DIR = 'data\data\com.zing.zalo'
+                media_dir = 'data\media'
                 DIR_iOS = 'private\\var\mobile\Library\FrontBoard'
                 for dir in dirs:
                     dd = os.path.join(root, dir)
@@ -312,11 +325,18 @@ class Window(tk.Tk):
                         duong_dan = dd
                         operating_system = 'android'
                         self.entry_log.insert(tk.END, f'- Đã tìm thấy dữ liệu ứng dụng Zalo \n')
-                        self.entry_log.insert(tk.END, f'- Đang phân tich... \n')
+                        self.entry_log.insert(tk.END, f'- Đang phân tích... \n')
                         break
                     elif dd.endswith(DIR_iOS):
                         operating_system = 'iOS'
                         duong_dan = dd
+                        break
+
+                # Tìm đường dẫn thư mục media để trích xuất các file đính kèm:
+                for dir in dirs:
+                    dd = os.path.join(root, dir)
+                    if dd.endswith(media_dir):
+                        media_path = dd
                         break
 
             if duong_dan == '':
@@ -329,15 +349,15 @@ class Window(tk.Tk):
                 self.entry_log.insert(tk.END, f'- Đã tìm thấy ứng dung zalo tại: {duong_dan} \n')
                 self.db_analysic(duong_dan)
             elif operating_system == 'iOS':
-                global df_final_1
+                global df_final_1, path_full, id_zalo_owner
                 # Cắt lấy phần đầu của biến duong_dan:
                 dd1 = duong_dan.split('\\private')[0]
                 try:
                     zalo_path=''
                     self.entry_log.insert(tk.END, f'- Đang tìm ứng dụng Zalo \n')
                     zalo_path = Zalo_iOS(duong_dan).scan_zalo_iOS()
-                    if zalo_path=='':
-                        self.entry_log.insert(tk.END, f'- Đã tìm thấy dữ liệu ứng dụng Zalo \n')
+                    if zalo_path == '':
+                        self.entry_log.insert(tk.END, f'- Không tìm thấy dữ liệu ứng dụng Zalo \n')
                     else:
                         self.entry_log.insert(tk.END, f'- Đã tìm thấy dữ liệu ứng dụng Zalo \n')
                         self.entry_log.insert(tk.END, f'- Đang phân tich... \n')
@@ -362,14 +382,13 @@ class Window(tk.Tk):
                     print(e)
 
     def db_analysic(self, zalo_path):
-        global df_final_1, df_final_2, number_of_zalo
+        global df_final_1, df_final_2, number_of_zalo, danh_ba
         ZALO = 'zalo'
         FILE_BIN_1 = 'phone_contact_list_server_version.bin'
         FILE_BIN_2 = 'phonecontactlist.bin'
 
         # Tạo mảng danh_sach_bin_file chứa đường dẫn của 02 file .bin
         # Tạo mảng danh_ba chứa đường dẫn của file 'zalo'
-        global danh_ba
         danh_sach_bin_file, danh_ba = [], []
 
         # Quét tất cả các file, thư mục có trong đường dẫn đã chọn:
@@ -466,8 +485,10 @@ class Window(tk.Tk):
 
         elif number_id == 1:
             self.zalo_owner_id.config(text=f'{owner_id[0]}')
+
         elif number_id == 2:
             self.zalo_owner_id.config(text=f'{owner_id[0]}, {owner_id[1]}')
+
         return number_id
 
     def get_contact(self, path_zalo_file, ds_bin_file):
@@ -487,14 +508,14 @@ class Window(tk.Tk):
         # Phần này trở lên đã OK
 
         # Lấy danh bạ từ bảng contact_profile_5 trong database 'zalo':
-        query1 = 'SELECT uid, dpn from contact_profile_5'
+        query1 = "SELECT uid, dpn from contact_profile_5 where trim(uid)<>''"
         du_lieu = Connect_DB(path_zalo_file, query1).connect()
 
         df_1 = pd.DataFrame(du_lieu, columns=['uid', 'dpn'])
         df_1 = df_1.rename(columns={'uid': 'zaloUid', 'dpn': 'displayName'})
 
         # Lấy danh bạ từ bảng chat_content trong database 'zalo':
-        query2 = 'SELECT senderUid, senderName from chat_content'
+        query2 = 'SELECT senderUid, senderName from chat_content where trim(senderUid)<>""'
         try:
             du_lieu_2 = Connect_DB(path_zalo_file, query2).connect()
 
@@ -506,7 +527,8 @@ class Window(tk.Tk):
             df_2 = pd.DataFrame()
 
         # Lấy dữ liệu danh bạ từ bảng contact_profile_zalo trong database 'zalo':
-        query3 = 'SELECT uid, dpn from contact_profile_zalo where uid not in (SELECT uid from contact_profile_5)'
+        query3 = 'SELECT uid, dpn from contact_profile_zalo where uid not in (SELECT uid from contact_profile_5) ' \
+                 'and trim(uid)<>""'
         du_lieu_3 = Connect_DB(path_zalo_file, query3).connect()
 
         df_3 = pd.DataFrame(du_lieu_3, columns=['uid', 'dpn'])
@@ -528,6 +550,7 @@ class Window(tk.Tk):
         try:
             # Xóa những dòng có giá trị NaN khi convert sang int sẽ bị lỗi:
             df_danh_ba_tong = df_danh_ba_tong.dropna()
+
             df_danh_ba_tong = df_danh_ba_tong.astype({'SenderId': int})
         except Exception as e:
             print(e)
@@ -645,12 +668,14 @@ class Window(tk.Tk):
 
         return df_final
 
-        # Xử lý thông tin về người nhận tin nhắn:
-
+    # Xử lý thông tin về người nhận tin nhắn:
     def replace_receiver(self, df, id_chu_tk):
         do_dai = len(df)
-        df_thong_tin_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'] == int(id_chu_tk))]
-        self.zalo_owner_name.config(text=f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]} có {do_dai} tin nhắn.')
+        try:
+            df_thong_tin_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'].astype(int) == int(id_chu_tk))]
+            self.zalo_owner_name.config(text=f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]} có {do_dai} tin nhắn.')
+        except Exception as e:
+            print(e)
 
         for i in range(do_dai):
             # byte_data = df.iloc[i]['BinNet']
@@ -687,10 +712,36 @@ class Window(tk.Tk):
         else:
             if rd_button == 2:
                 df.to_csv(os.path.join(ten_folder, 'Zalo messages.csv'), encoding='utf-16', sep='\t', na_rep='N/A')
+                self.extract_attachment(ten_folder)
                 self.entry_log.insert(tk.END, '- Đã trích xuất xong \n')
             elif rd_button == 1:
                 df.to_html(os.path.join(ten_folder, 'Zalo messages.html'), justify='center', bold_rows=False)
+                self.extract_attachment(ten_folder)
                 self.entry_log.insert(tk.END, '- Đã trích xuất xong \n')
+
+    def extract_attachment(self, destination_path):
+        """
+        :Trích xuất các file đính kèm
+        """
+        if operating_system == 'iOS':
+            source_path = path_full
+
+            string_condition = 'Documents\\' + str(id_zalo_owner)
+            for root, dirs, files in os.walk(source_path):
+                for dir1 in dirs:
+                    path_1 = os.path.join(root, dir1)
+                    if path_1.endswith(string_condition):
+                        # Tạo một thư mục Attachment nằm trong thư mục được chọn để chứa các file đính kèm
+                        new_path = os.path.join(destination_path, 'Attachment')
+                        os.mkdir(new_path)
+                        shutil.copytree(path_1, new_path, dirs_exist_ok=True)
+
+        elif operating_system == 'android':
+            source_path = duong_dan
+            zalo_media_path = os.path.join(media_path, 'Download\\Zalo')
+            new_path = os.path.join(destination_path, 'Media\\Download')
+            os.mkdir(new_path)
+            shutil.copytree(zalo_media_path, new_path, dirs_exist_ok=True)
 
     def xem(self):
         webbrowser.open(os.path.realpath(ten_folder))

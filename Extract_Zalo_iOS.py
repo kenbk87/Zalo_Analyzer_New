@@ -9,6 +9,9 @@ class Analysis_Zalo_iOS:
 
     # Trích xuất danh bạ từ thư mục ứng dụng Zalo:
     def analysis(self):
+        """
+            1. Lấy danh bạ của Zalo từ database profile.sqlite
+        """
         path_contact = ''
         path_contact_2 = ''
         for root, dirs, files in os.walk(self.path):
@@ -40,8 +43,10 @@ class Analysis_Zalo_iOS:
 
         return df_contact
 
-    # Tìm thư mục chứa database tin nhắn Zalo:
     def find_db(self):
+        """
+            Tìm thư mục chứa database tin nhắn Zalo:
+        """
         chat_folder = ''
         db_path = ''
         for root, dirs, files in os.walk(self.path):
