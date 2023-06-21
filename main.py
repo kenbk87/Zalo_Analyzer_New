@@ -480,8 +480,8 @@ class Window(tk.Tk):
             self.zalo_owner_id.config(text=f'{owner_id[0]}')
 
             # Tìm tên chủ tài khoản Zalo:
-            df_thong_tin_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'] == int(owner_id[0]))]
-            self.zalo_owner_name.config(text=f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]}')
+            df_tt_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'] == int(owner_id[0]))]
+            self.zalo_owner_name.config(text=f'- Tài khoản: {df_tt_chu_tk.iat[0, 1]}')
 
         elif number_id == 1:
             self.zalo_owner_id.config(text=f'{owner_id[0]}')
@@ -670,12 +670,13 @@ class Window(tk.Tk):
 
     # Xử lý thông tin về người nhận tin nhắn:
     def replace_receiver(self, df, id_chu_tk):
+        """
+        :Thay đổi tên ngời nhận
+        :id_chu_tk: ID của chủ tài khoản Zalo
+        """
         do_dai = len(df)
-        try:
-            df_thong_tin_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'].astype(int) == int(id_chu_tk))]
-            self.zalo_owner_name.config(text=f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]} có {do_dai} tin nhắn.')
-        except Exception as e:
-            print(e)
+        df_thong_tin_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'].astype(int) == int(id_chu_tk))]
+        self.zalo_owner_name.config(text=f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]} có {do_dai} tin nhắn.')
 
         for i in range(do_dai):
             # byte_data = df.iloc[i]['BinNet']
