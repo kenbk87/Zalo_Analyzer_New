@@ -272,6 +272,7 @@ class Window(tk.Tk):
 
                     except Exception as e:
                         self.entry_log.insert(tk.END, f'- {e} \n')
+                        continue
             Tar_file.close()
         self.entry_log.insert(tk.INSERT, f'- Extract {os.path.basename(file_name)} done!!! \n')
         self.entry_log.see(tk.END)
@@ -302,6 +303,9 @@ class Window(tk.Tk):
             self.scan_folder(folder_name)
 
     def scan_image_folder(self):
+        """
+        :quét thư mục ảnh đã được giải nén:
+        """
         folder_name = self.entry_folder_selected_2.get().strip()
         if folder_name == '' or folder_name == 'Select image folder':
             ms.showwarning('Wanring', 'Please select folder to scan!!')
@@ -309,6 +313,9 @@ class Window(tk.Tk):
             self.scan_folder(folder_name)
 
     def scan_folder(self, folder_selected):
+        """
+        :param folder_selected:
+        """
         global df_danh_ba_tong, operating_system, duong_dan, media_path
         if folder_selected == '':
             ms.showwarning('Warning', 'Chưa chọn thư mục để lưu \U0001F606 \U0001F606 \U0001F606')
@@ -317,7 +324,7 @@ class Window(tk.Tk):
             # Chia làm 2 lần quét, quét thư mục com.zing.zalo trước
             for root, dirs, files in os.walk(folder_selected):
                 ZALO_DIR = 'data\data\com.zing.zalo'
-                media_dir = 'data\media'
+                media_dir = 'Pictures\Zalo'
                 DIR_iOS = 'private\\var\mobile\Library\FrontBoard'
                 for dir in dirs:
                     dd = os.path.join(root, dir)
@@ -335,7 +342,7 @@ class Window(tk.Tk):
                 # Tìm đường dẫn thư mục media để trích xuất các file đính kèm:
                 for dir in dirs:
                     dd = os.path.join(root, dir)
-                    if dd.endswith(media_dir):
+                    if dd.endswith(media_dir) and 'media' in dd:
                         media_path = dd
                         break
 
@@ -382,6 +389,9 @@ class Window(tk.Tk):
                     print(e)
 
     def db_analysic(self, zalo_path):
+        """
+        :param zalo_path:
+        """
         global df_final_1, df_final_2, number_of_zalo, danh_ba
         ZALO = 'zalo'
         FILE_BIN_1 = 'phone_contact_list_server_version.bin'
@@ -491,7 +501,8 @@ class Window(tk.Tk):
 
         return number_id
 
-    def get_contact(self, path_zalo_file, ds_bin_file):
+    @staticmethod
+    def get_contact(path_zalo_file, ds_bin_file):
         """
             Get contact data of Zalo
         """
@@ -560,6 +571,11 @@ class Window(tk.Tk):
         return df_danh_ba_tong
 
     def get_data(self, df_danh_ba_tong, danh_sach_db):
+        """
+        :param df_danh_ba_tong:
+        :param danh_sach_db:
+        :return:
+        """
         df = pd.DataFrame(columns=['SenderId', 'TimeStamp', 'Content', 'LocalPath'])
         df_danh_ba_tong_2 = df_danh_ba_tong.rename(columns={'SenderId': 'AttendId', 'SenderName': 'AttendName'})
         so_db = len(danh_sach_db)
@@ -614,8 +630,13 @@ class Window(tk.Tk):
 
         # Hàm lấy dữ liệu tin nhắn từ file zalo khi không có các database tin nhắn:
 
-    def get_data_no_db(self, df_danh_ba, duong_dan_zalo_file):
-
+    @staticmethod
+    def get_data_no_db(df_danh_ba, duong_dan_zalo_file):
+        """
+        :param df_danh_ba:
+        :param duong_dan_zalo_file:
+        :return:
+        """
         df_danh_ba_tong_2 = df_danh_ba.rename(columns={'SenderId': 'AttendId', 'SenderName': 'AttendName'})
 
         query = 'SELECT senderUid, message, ownerId, datetime(ROUND(timestamp/1000), \'unixepoch\', \'localtime\'),' \
@@ -700,6 +721,9 @@ class Window(tk.Tk):
         # Trích xuất dữ liệu ra định dạng excel hoặc html:
 
     def trich_xuat(self):
+        """
+            Trích xuất dữ liệu tin nhắn và các tệp tin đính kèm
+        """
         global ten_folder
         ten_folder = fd.askdirectory()
         self.entry_log.insert(tk.END, f'- Đã chọn thư mục: {ten_folder} \n')
@@ -720,9 +744,10 @@ class Window(tk.Tk):
                 self.extract_attachment(ten_folder)
                 self.entry_log.insert(tk.END, '- Đã trích xuất xong \n')
 
-    def extract_attachment(self, destination_path):
+    @staticmethod
+    def extract_attachment(destination_path):
         """
-        :Trích xuất các file đính kèm
+        :Trích xuất các file đính kèm:
         """
         if operating_system == 'iOS':
             source_path = path_full
@@ -733,18 +758,23 @@ class Window(tk.Tk):
                     path_1 = os.path.join(root, dir1)
                     if path_1.endswith(string_condition):
                         # Tạo một thư mục Attachment nằm trong thư mục được chọn để chứa các file đính kèm
-                        new_path = os.path.join(destination_path, 'Attachment')
-                        os.mkdir(new_path)
+                        new_path = os.path.join(destination_path, 'Attachment\\Documents')
+                        os.makedirs(new_path)
                         shutil.copytree(path_1, new_path, dirs_exist_ok=True)
 
         elif operating_system == 'android':
-            source_path = duong_dan
-            zalo_media_path = os.path.join(media_path, 'Download\\Zalo')
-            new_path = os.path.join(destination_path, 'Media\\Download')
-            os.mkdir(new_path)
-            shutil.copytree(zalo_media_path, new_path, dirs_exist_ok=True)
 
-    def xem(self):
+            # Đang bị lỗi FileNotFoundError: [WinError 3] The system cannot find the path specified:
+            # 'D:/A18\\Pictures\\Zalo'
+            new_path = os.path.join(destination_path, 'Pictures\\Zalo')
+            os.makedirs(new_path)
+            shutil.copytree(media_path, new_path, dirs_exist_ok=True)
+
+    @staticmethod
+    def xem():
+        """
+            Mở thư mục lưu
+        """
         webbrowser.open(os.path.realpath(ten_folder))
 
     def create_report(self):
