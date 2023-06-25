@@ -56,9 +56,9 @@ class Zalo_iOS:
                         var2 = plist.get('bundlePath', '')
                         var3 = plist.get('sandboxPath', '')
 
-                        print(f'var1: {var1}')
-                        print(f'var2: {var2}')
-                        print(f'var3: {var3}')
+                        print(f'bundleIdentifier: {var1}')
+                        print(f'bundlePath: {var2}')
+                        print(f'sandboxPath: {var3}')
                     else:
                         print(f'For {row[0]} Unexpected type "' + str(
                             type(plist)) + '" found as plist root, can\'t process')

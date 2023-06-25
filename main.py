@@ -17,6 +17,7 @@ from Path_Zalo_iOS import Zalo_iOS
 from Extract_Zalo_iOS import Analysis_Zalo_iOS
 from Extract_From_ZaloDB import *
 from Scan_DB_Files import Scan_DB_files
+from BinNet_Analysis import BinNet_Analysis
 
 import webbrowser
 from mailmerge import MailMerge
@@ -243,6 +244,7 @@ class Window(tk.Tk):
         save_folder = self.entry_folder_selected.get().strip()
         save_folder = '\\\\?\\' + save_folder.replace('/', '\\')
         self.entry_log.insert(tk.END, f'- Đã chọn thư mục lưu: {save_folder} \n')
+        self.entry_log.insert(tk.END, f'- Đang giải nén, vui lòng đợi...\n')
         if file_name.endswith('.zip'):
             with ZipFile(file_name) as zip_file:
                 file_list = zip_file.namelist()
@@ -366,7 +368,7 @@ class Window(tk.Tk):
                 # Cắt lấy phần đầu của biến duong_dan:
                 dd1 = duong_dan.split('\\private')[0]
                 try:
-                    zalo_path=''
+                    zalo_path = ''
                     self.entry_log.insert(tk.END, f'- Đang tìm ứng dụng Zalo \n')
                     zalo_path = Zalo_iOS(duong_dan).scan_zalo_iOS()
                     if zalo_path == '':
@@ -381,18 +383,27 @@ class Window(tk.Tk):
                 path_full = dd1 + zalo_path
                 db_path = Analysis_Zalo_iOS(path_full).find_db()
 
-                try:
-                    list_db = Scan_DB_files(db_path).scan_db()
+                df_danh_ba_tong = Analysis_Zalo_iOS(path_full).analysis()
 
-                    df_danh_ba_tong = Analysis_Zalo_iOS(path_full).analysis()
+                # Quét danh dách database hội thoại:
+                list_db = Scan_DB_files(db_path).scan_db()
+                so_db = len(list_db)
+                if so_db == 0:
+                    # Các dữ liệu tin nhắn không nằm trong nhiều các database hội thoại nữa mà chúng sẽ nằm trong
+                    # database chat.sqlite và chatgroup.sqlite:
+                    print(f'Đang phát triển chức năng này...')
+                    self.entry_log.insert(tk.END, f'Đang phát triển chức năng này... \n')
+                    ###############
+
+                    ###############
+
+                else:
                     df = ExtractZaloDB(df_danh_ba_tong, list_db).extract_data()
 
                     id_zalo_owner = self.get_zalo_owner_iOS(db_path, df_danh_ba_tong)
                     df_final_1 = self.replace_receiver(df, id_zalo_owner)
 
                     self.display_data(df_final_1)
-                except Exception as e:
-                    print(e)
 
     def db_analysic(self, zalo_path):
         """
@@ -706,10 +717,10 @@ class Window(tk.Tk):
         self.zalo_owner_name.config(text=f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]} có {do_dai} tin nhắn.')
 
         for i in range(do_dai):
-            # byte_data = df.iloc[i]['BinNet']
-            # data_decode = byte_data.decode('utf-8', 'ignore')
-            #
-            # df._set_value(i + 1, 'BinNet', data_decode)
+            byte_data = df.iloc[i]['BinNet']
+            data_decode = BinNet_Analysis(byte_data).convert_BinNet()
+
+            df._set_value(i + 1, 'BinNet', data_decode)
 
             if df.iloc[i]['SenderId'] == df.iloc[i]['AttendId']:
                 df._set_value(i + 1, 'AttendName', df_thong_tin_chu_tk.iat[0, 1])
@@ -747,6 +758,10 @@ class Window(tk.Tk):
                 self.entry_log.insert(tk.END, '- Đã trích xuất xong \n')
             elif rd_button == 1:
                 df.to_html(os.path.join(ten_folder, 'Zalo messages.html'), justify='center', bold_rows=False)
+                self.extract_attachment(ten_folder)
+                self.entry_log.insert(tk.END, '- Đã trích xuất xong \n')
+            elif rd_button == 0:
+                df.to_csv(os.path.join(ten_folder, 'Zalo messages.csv'), encoding='utf-16', sep='\t', na_rep='N/A')
                 self.extract_attachment(ten_folder)
                 self.entry_log.insert(tk.END, '- Đã trích xuất xong \n')
 
