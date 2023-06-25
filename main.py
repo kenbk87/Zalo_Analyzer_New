@@ -141,25 +141,30 @@ class Window(tk.Tk):
         self.radiobutton_excel.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
 
         self.radiobutton_html = ttk.Radiobutton(self.export_frame, text='HTML', variable=var, value=1)
-        self.radiobutton_html.grid(row=0, column=1, padx=5, pady=5, sticky='ew')
+        self.radiobutton_html.grid(row=1, column=0, padx=5, pady=5, sticky='ew')
 
         self.radiobutton_csv = ttk.Radiobutton(self.export_frame, text='CSV', variable=var, value=2)
-        self.radiobutton_csv.grid(row=0, column=2, padx=5, pady=5, sticky='ew')
+        self.radiobutton_csv.grid(row=2, column=0, padx=5, pady=5, sticky='ew')
 
         self.btn_export = ttk.Button(self.export_frame, text='Export', command=self.trich_xuat)
-        self.btn_export.grid(row=0, column=3, pady=5, padx=5, sticky='ew')
+        self.btn_export.grid(row=0, column=2, pady=5, padx=5, sticky='ew')
 
         self.btn_view = ttk.Button(self.export_frame, text='Open', command=self.xem)
-        self.btn_view.grid(row=1, column=3, pady=5, padx=5, sticky='ew')
+        self.btn_view.grid(row=1, column=2, pady=5, padx=5, sticky='ew')
 
         self.btn_report = ttk.Button(self.export_frame, text='Create a Report', command=self.create_report)
-        self.btn_report.grid(row=1, column=0, columnspan=2, pady=5, padx=5, sticky='ew')
+        self.btn_report.grid(row=2, column=2, pady=5, padx=5, sticky='ew')
+
+        self.delete_switch = ttk.Checkbutton(self.export_frame, text='Delete Image Folder',
+                                             style='Switch',
+                                             command=self.toggle_mode)
+        self.delete_switch.grid(row=0, column=1, padx=5, pady=5, sticky='ew')
         ################################################################################################################
         # Create a log frame:
         self.log_frame = ttk.LabelFrame(frame, text='Log:')
         self.log_frame.grid(row=2, column=2, padx=5, pady=5, sticky='nsew')
 
-        self.entry_log = scrolledtext.ScrolledText(self.log_frame, height=6)
+        self.entry_log = scrolledtext.ScrolledText(self.log_frame, height=7)
         self.entry_log.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
         ################################################################################################################
         # Create a tooltip:
@@ -232,6 +237,7 @@ class Window(tk.Tk):
             1. Unzip a zip file with zipfile library
             2. Unzip a tar file with tarfile library
         """
+        global save_folder
         file_name = self.entry_file_selected.get().strip()
         file_name = '\\\\?\\' + file_name.replace('/', '\\')
         save_folder = self.entry_folder_selected.get().strip()
@@ -744,8 +750,7 @@ class Window(tk.Tk):
                 self.extract_attachment(ten_folder)
                 self.entry_log.insert(tk.END, '- Đã trích xuất xong \n')
 
-    @staticmethod
-    def extract_attachment(destination_path):
+    def extract_attachment(self, destination_path):
         """
         :Trích xuất các file đính kèm:
         """
@@ -757,18 +762,20 @@ class Window(tk.Tk):
                 for dir1 in dirs:
                     path_1 = os.path.join(root, dir1)
                     if path_1.endswith(string_condition):
-                        # Tạo một thư mục Attachment nằm trong thư mục được chọn để chứa các file đính kèm
+                        # Tạo một thư mục Attachment/Documents nằm trong thư mục được chọn để chứa các file đính kèm
                         new_path = os.path.join(destination_path, 'Attachment\\Documents')
                         os.makedirs(new_path)
                         shutil.copytree(path_1, new_path, dirs_exist_ok=True)
 
         elif operating_system == 'android':
-
-            # Đang bị lỗi FileNotFoundError: [WinError 3] The system cannot find the path specified:
-            # 'D:/A18\\Pictures\\Zalo'
             new_path = os.path.join(destination_path, 'Pictures\\Zalo')
             os.makedirs(new_path)
             shutil.copytree(media_path, new_path, dirs_exist_ok=True)
+
+        if self.delete_switch.instate(['selected']):
+            shutil.rmtree(save_folder)
+        else:
+            pass
 
     @staticmethod
     def xem():
