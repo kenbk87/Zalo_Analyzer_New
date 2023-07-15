@@ -16,10 +16,10 @@ class Analysis_Zalo_iOS:
         path_contact_2 = ''
         for root, dirs, files in os.walk(self.path):
             for file in files:
-                if str(file) == 'profile.sqlite':
+                if file == 'profile.sqlite':
                     path_contact = os.path.join(root, file)
-                    break
-                elif str(file) == 'chatgroup.sqlite':
+
+                elif file == 'chatgroup.sqlite':
                     path_contact_2 = os.path.join(root, file)
         if path_contact == '':
             print('Không tìm thấy dữ liệu danh bạ')

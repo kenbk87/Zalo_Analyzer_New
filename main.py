@@ -18,6 +18,7 @@ from Extract_Zalo_iOS import Analysis_Zalo_iOS
 from Extract_From_ZaloDB import *
 from Scan_DB_Files import Scan_DB_files
 from BinNet_Analysis import BinNet_Analysis
+from Get_Data_iOS import *
 
 import webbrowser
 from mailmerge import MailMerge
@@ -391,11 +392,18 @@ class Window(tk.Tk):
                 if so_db == 0:
                     # Các dữ liệu tin nhắn không nằm trong nhiều các database hội thoại nữa mà chúng sẽ nằm trong
                     # database chat.sqlite và chatgroup.sqlite:
-                    print(f'Đang phát triển chức năng này...')
-                    self.entry_log.insert(tk.END, f'Đang phát triển chức năng này... \n')
-                    ###############
+                    path_chat_sqlite, path_chatgroup_sqlite = '', ''
 
-                    ###############
+                    for root, dirs, files in os.walk(path_full):
+                        for file in files:
+                            path = os.path.join(root, file)
+                            if path.endswith('Documents\chat.sqlite'):
+                                path_chat_sqlite = path
+                            elif path.endswith('Documents\chatgroup.sqlite'):
+                                path_chatgroup_sqlite = path
+
+                    df_final_1 = Get_Data_iOS(df_danh_ba_tong, path_chat_sqlite, path_chatgroup_sqlite).get_data()
+                    self.display_data(df_final_1)
 
                 else:
                     df = ExtractZaloDB(df_danh_ba_tong, list_db).extract_data()
