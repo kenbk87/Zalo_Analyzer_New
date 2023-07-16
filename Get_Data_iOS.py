@@ -11,11 +11,11 @@ class Get_Data_iOS:
 
     def get_data(self):
         query1 = 'SELECT fuid, tuid, message, datetime(ROUND(ts/1000), \'unixepoch\', \'localtime\'),' \
-                'metadata  from ChatEntity'
+                 'metadata  from ChatEntity'
         df_final_1 = self.get_data_from(self.df_danh_ba, self.duong_dan_zalo_file, query1)
 
         query2 = 'SELECT fuid, tuid, message, datetime(ROUND(ts/1000), \'unixepoch\', \'localtime\'),' \
-                'metadata  from ChatGroupEntity'
+                 'metadata  from ChatGroupEntity'
         df_final_2 = self.get_data_from(self.df_danh_ba, self.duong_dan_zalo_group, query2)
 
         df_final_1 = pd.concat([df_final_1, df_final_2], ignore_index=True)
@@ -68,3 +68,24 @@ class Get_Data_iOS:
                                             'Content': 'Nội dung',
                                             'Metadata': 'Metadata'})
         return df_final
+
+    def get_owner_name(self):
+        """
+            Lấy tên chủ tài khoản Zalo
+        """
+        query = 'SELECT userid from ChatEntity LIMIT 1'
+        du_lieu = Connect_DB(self.duong_dan_zalo_file, query).connect()
+
+        df_du_lieu = pd.DataFrame(du_lieu, columns=['SenderId'])
+        df_du_lieu = df_du_lieu.astype({'SenderId': int}, errors='raise')
+
+        df_merged_owner = pd.merge(df_du_lieu, self.df_danh_ba, how='left', on='SenderId')
+        return df_merged_owner.iat[0, 1]
+
+    def get_owner_id(self):
+        """
+            Lấy id chủ tài khoản Zalo
+        """
+        query = 'SELECT userid from ChatEntity LIMIT 1'
+        du_lieu = Connect_DB(self.duong_dan_zalo_file, query).connect()
+        return du_lieu[0][0]

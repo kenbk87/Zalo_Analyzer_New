@@ -1,6 +1,4 @@
 import sqlite3
-import os
-
 
 class Connect_DB:
     def __init__(self, db_name, query):

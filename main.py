@@ -112,7 +112,7 @@ class Window(tk.Tk):
         self.info_3 = ttk.Label(self.info_frame, text='Zalo Owner Name: ')
         self.info_3.grid(row=2, column=0, padx=5, pady=5, sticky='w')
 
-        self.zalo_owner_name = ttk.Label(self.info_frame, text='', wraplength=100)
+        self.zalo_owner_name = ttk.Label(self.info_frame, text='', wraplength=200)
         self.zalo_owner_name.grid(row=2, column=1, padx=5, pady=5, sticky='w')
         ################################################################################################################
         # Create a frame to display data:
@@ -315,6 +315,7 @@ class Window(tk.Tk):
         """
         :quét thư mục ảnh đã được giải nén:
         """
+        self.entry_log.insert(tk.END, f'- Đang phân tích, vui lòng đợi...\n')
         folder_name = self.entry_folder_selected_2.get().strip()
         if folder_name == '' or folder_name == 'Select image folder':
             ms.showwarning('Wanring', 'Please select folder to scan!!')
@@ -389,11 +390,11 @@ class Window(tk.Tk):
                 # Quét danh dách database hội thoại:
                 list_db = Scan_DB_files(db_path).scan_db()
                 so_db = len(list_db)
+
                 if so_db == 0:
                     # Các dữ liệu tin nhắn không nằm trong nhiều các database hội thoại nữa mà chúng sẽ nằm trong
                     # database chat.sqlite và chatgroup.sqlite:
                     path_chat_sqlite, path_chatgroup_sqlite = '', ''
-
                     for root, dirs, files in os.walk(path_full):
                         for file in files:
                             path = os.path.join(root, file)
@@ -404,6 +405,13 @@ class Window(tk.Tk):
 
                     df_final_1 = Get_Data_iOS(df_danh_ba_tong, path_chat_sqlite, path_chatgroup_sqlite).get_data()
                     self.display_data(df_final_1)
+
+                    id_zalo_owner = Get_Data_iOS(df_danh_ba_tong, path_chat_sqlite,path_chatgroup_sqlite).get_owner_id()
+                    self.zalo_owner_id.config(text=f'{id_zalo_owner}')
+
+                    owner_name = Get_Data_iOS(df_danh_ba_tong, path_chat_sqlite, path_chatgroup_sqlite).get_owner_name()
+                    number_of_message = len(df_final_1)
+                    self.zalo_owner_name.config(text=f'Tài khoản: {owner_name} có {number_of_message} tin nhắn')
 
                 else:
                     df = ExtractZaloDB(df_danh_ba_tong, list_db).extract_data()
