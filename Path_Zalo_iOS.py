@@ -1,8 +1,6 @@
 import sys
-
 from Connect_DB import *
 import os
-
 import biplist
 import io
 import nska_deserialize as nd

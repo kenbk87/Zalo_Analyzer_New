@@ -1,4 +1,5 @@
 import re
+import stat
 import tarfile
 import tkinter as tk
 import zipfile
@@ -12,7 +13,6 @@ from zipfile import ZipFile
 
 from pandastable import Table
 
-
 from Path_Zalo_iOS import Zalo_iOS
 from Extract_Zalo_iOS import Analysis_Zalo_iOS
 from Extract_From_ZaloDB import *
@@ -21,7 +21,9 @@ from BinNet_Analysis import BinNet_Analysis
 from Get_Data_iOS import *
 
 import webbrowser
-from mailmerge import MailMerge
+# from mailmerge import MailMerge, Không sử dụng mailmerge nữa do mailmerge đã thay đổi cấu trúc
+from docxtpl import DocxTemplate
+
 
 from threading import Thread
 import pandas as pd
@@ -34,6 +36,9 @@ class Window(tk.Tk):
         super().__init__()
 
         self.title('Zalo Analyzer 2.0 - Designed by K3n')
+        # Cửa sổ chính cũng phải co giãn 4 chiều
+        self.rowconfigure(0, weight=1)  # cửa sổ chính
+        self.columnconfigure(0, weight=1)
         # self.iconbitmap('./Resource/image/trash.png')
         # Call style:
         self.style = ttk.Style(self)
@@ -41,21 +46,34 @@ class Window(tk.Tk):
         self.tk.call('source', 'forest-dark.tcl')
         self.style.theme_use('forest-dark')
 
-        # Create self frame that contain all frame:
+        # Tạo frame cửa sổ chính có thể co giãn theo 4 chiều:
         frame = ttk.Frame(self)
-        frame.pack()
+        frame.grid(row=0, column=0, sticky="nsew")
+        frame.rowconfigure(0, weight=1)
+        frame.columnconfigure(0,weight=1)
+
+        self.geometry("1200x900")
 
         ################################################################################################################
-        # Create the first frame:
-        self.widgets_frame = ttk.LabelFrame(frame, text='Image file analysis: ')
-        self.widgets_frame.grid(row=0, column=0, padx=5, pady=5, columnspan=2, sticky='nsew')
+        self.nhap_lieu_frame = ttk.LabelFrame(frame, text='Nhập liệu:')
 
-        self.entry_file_selected = ttk.Entry(self.widgets_frame, width=55)
-        self.entry_file_selected.insert(0, 'Select image file')
+        self.nhap_lieu_frame.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+        self.nhap_lieu_frame.rowconfigure(0, weight=1)
+        self.nhap_lieu_frame.columnconfigure(0, weight=1)
+
+        # Tạo frame thứ nhất thuộc frame nhập liệu:
+        self.widgets_frame = ttk.LabelFrame(self.nhap_lieu_frame, text='Image file analysis:')
+
+        self.widgets_frame.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+        self.widgets_frame.rowconfigure(0, weight=1)
+        self.widgets_frame.columnconfigure(0, weight=1, uniform="cols")
+
+        self.entry_file_selected = ttk.Entry(self.widgets_frame)
+        self.entry_file_selected.insert(0, 'Select image file...')
         self.entry_file_selected.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
 
         self.entry_folder_selected = ttk.Entry(self.widgets_frame)
-        self.entry_folder_selected.insert(0, 'Select save folder')
+        self.entry_folder_selected.insert(0, 'Select save folder...')
         self.entry_folder_selected.grid(row=1, column=0, padx=5, pady=5, sticky='ew')
 
         self.button_select_file = ttk.Button(self.widgets_frame, text='Browse', command=self.select_file)
@@ -67,80 +85,81 @@ class Window(tk.Tk):
         self.separator = ttk.Separator(self.widgets_frame, orient='vertical')
         self.separator.grid(row=0, column=2, rowspan=2, padx=5, pady=5, sticky='ns')
 
-        self.button_unzip = ttk.Button(self.widgets_frame, text='Analysis', command=self.unzip_threading, width=18)
-        self.button_unzip.grid(row=0, column=3, columnspan=2, padx=5, pady=10, sticky='nsew')
+        self.button_unzip = ttk.Button(self.widgets_frame, text='Analysis', command=self.unzip_threading)
+        self.button_unzip.grid(row=0, column=3, padx=5, pady=5)
 
-        self.mode_switch = ttk.Checkbutton(self.widgets_frame, text='Mode', style='Switch', command=self.toggle_mode)
-        self.mode_switch.grid(row=1, column=4, padx=5, pady=5, sticky='ew')
+        # Tạo frame nhập liệu thứ 2:
+        self.folder_frame = ttk.LabelFrame(self.nhap_lieu_frame, text='Image folder analysis:')
 
-        ################################################################################################################
-        # Create the second frame:
-        self.folder_frame = ttk.LabelFrame(frame, text='Image folder analysis:')
-        self.folder_frame.grid(row=0, column=2, padx=5, pady=5, sticky='nsew')
+        self.folder_frame.grid(row=0, column=1, padx=5, pady=5, sticky='ew')
+        self.folder_frame.rowconfigure(0, weight=1)
+        self.folder_frame.columnconfigure(1, weight=1, uniform="cols")
 
-        self.entry_folder_selected_2 = ttk.Entry(self.folder_frame, width=40)
+        self.entry_folder_selected_2 = ttk.Entry(self.folder_frame)
         self.entry_folder_selected_2.insert(0, 'Select image folder')
         self.entry_folder_selected_2.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
 
         self.button_select_folder_2 = ttk.Button(self.folder_frame, text='Browse', command=self.select_folder_image)
-        self.button_select_folder_2.grid(row=0, column=1, padx=5, pady=10)
+        self.button_select_folder_2.grid(row=0, column=1, padx=5, pady=5)
 
         self.separator = ttk.Separator(self.folder_frame, orient='vertical')
         self.separator.grid(row=0, column=2, padx=5, pady=5, sticky='ns')
 
-        self.button_folder_analysis = ttk.Button(self.folder_frame, text='Analysis', command=self.scan_folder_threading,
-                                                 width=18)
-        self.button_folder_analysis.grid(row=0, column=3, columnspan=2, padx=5, pady=5, sticky='ew')
+        self.button_folder_analysis = ttk.Button(self.folder_frame, text='Analysis', command=self.scan_folder_threading)
+        self.button_folder_analysis.grid(row=0, column=3, padx=5, pady=5)
+
+        self.mode_switch = ttk.Checkbutton(self.folder_frame, text='Mode', style='Switch', command=self.toggle_mode)
+        self.mode_switch.grid(row=1, column=3, padx=5, pady=5)
 
         ################################################################################################################
-        # Create a third frame:
-        self.info_frame = ttk.LabelFrame(frame, text='Account info:')
-        self.info_frame.grid(row=2, column=0, padx=5, pady=5, sticky='nsew')
-
-        self.info_1 = ttk.Label(self.info_frame, text='Number of conversation: ')
-        self.info_1.grid(row=0, column=0, padx=5, pady=5, sticky='w')
-
-        self.number_conversation = ttk.Label(self.info_frame, text='                        ')
-        self.number_conversation.grid(row=0, column=1, padx=5, pady=5, sticky='w')
-
-        self.info_2 = ttk.Label(self.info_frame, text='Zalo Owner ID: ')
-        self.info_2.grid(row=1, column=0, padx=5, pady=5, sticky='w')
-
-        self.zalo_owner_id = ttk.Label(self.info_frame, text='                        ')
-        self.zalo_owner_id.grid(row=1, column=1, padx=5, pady=5, sticky='w')
-
-        self.info_3 = ttk.Label(self.info_frame, text='Zalo Owner Name: ')
-        self.info_3.grid(row=2, column=0, padx=5, pady=5, sticky='w')
-
-        self.zalo_owner_name = ttk.Label(self.info_frame, text='', wraplength=200)
-        self.zalo_owner_name.grid(row=2, column=1, padx=5, pady=5, sticky='w')
-        ################################################################################################################
-        # Create a frame to display data:
-        self.result_frame = ttk.LabelFrame(frame, text='Result:')
-        self.result_frame.grid(row=1, column=0, columnspan=3, padx=5, pady=5, sticky='news')
+        # Tạo frame hiển thị dữ liệu:
+        self.result_frame = ttk.LabelFrame(frame, text='Kết quả:')
+        self.result_frame.grid(row=1, column=0, padx=5, pady=5, sticky='nsew')
+        self.result_frame.rowconfigure(1, weight=1)
+        self.result_frame.columnconfigure(0, weight=1)
 
         self.pt = Table(self.result_frame, showtoolbar=True, showstatusbar=True)
         self.pt.show()
 
         ################################################################################################################
-        # Create a status frame:
-        self.status_frame = ttk.LabelFrame(frame, text='Status:')
-        self.status_frame.grid(row=3, column=0, columnspan=3, padx=5, pady=5, sticky='ew')
+        # Tạo frame thông tin:
+        self.thong_tin_frame = ttk.LabelFrame(frame, text='Thông tin:')
+        self.thong_tin_frame.grid(row=2, column=0, padx=5, pady=5, sticky='ew')
+        self.thong_tin_frame.rowconfigure(2, weight=1)
+        self.thong_tin_frame.columnconfigure(0, weight=1)
 
-        self.lb_status = ttk.Label(self.status_frame)
-        self.lb_status.grid(row=1, column=0, padx=5, pady=5, sticky='e')
+        # Tạo frame thứ nhất thuộc frame thông tin:
+        self.info_frame = ttk.LabelFrame(self.thong_tin_frame, text='Account info:')
+        self.info_frame.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+        self.info_frame.rowconfigure(2, weight=1)
+        self.info_frame.columnconfigure(0, weight=1)
 
-        self.progress_bar = ttk.Progressbar(self.status_frame, length=1280)
-        self.progress_bar.grid(row=2, column=0, padx=5, pady=5, sticky='ew')
-        ################################################################################################################
-        # Create a export frame:
-        self.export_frame = ttk.LabelFrame(frame, text='Export:')
-        self.export_frame.grid(row=2, column=1, padx=5, pady=5, sticky='nsew')
+        self.info_1 = ttk.Label(self.info_frame, text='Number of conversation: ')
+        self.info_1.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+
+        self.number_conversation = ttk.Label(self.info_frame)
+        self.number_conversation.grid(row=0, column=1, padx=5, pady=5, sticky='ew')
+
+        self.info_2 = ttk.Label(self.info_frame, text='Zalo Owner ID: ')
+        self.info_2.grid(row=1, column=0, padx=5, pady=5, sticky='ew')
+
+        self.zalo_owner_id = ttk.Label(self.info_frame)
+        self.zalo_owner_id.grid(row=1, column=1, padx=5, pady=5, sticky='ew')
+
+        self.info_3 = ttk.Label(self.info_frame, text='Zalo Owner Name: ')
+        self.info_3.grid(row=2, column=0, padx=5, pady=5, sticky='ew')
+
+        self.zalo_owner_name = ttk.Label(self.info_frame)
+        self.zalo_owner_name.grid(row=2, column=1, padx=5, pady=5, sticky='ew')
+
+        # Tạo frame thứ 2 thuộc frame thông tin:
+        self.export_frame = ttk.LabelFrame(self.thong_tin_frame, text='Export:')
+        self.export_frame.grid(row=0, column=1, padx=5, pady=5, sticky='ew')
 
         global var
         var = tk.IntVar()
         self.radiobutton_excel = ttk.Radiobutton(self.export_frame, text='Excel', variable=var, value=0)
-        self.radiobutton_excel.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+        self.radiobutton_excel.grid(row=0, column=0, padx=5, pady=5)
 
         self.radiobutton_html = ttk.Radiobutton(self.export_frame, text='HTML', variable=var, value=1)
         self.radiobutton_html.grid(row=1, column=0, padx=5, pady=5, sticky='ew')
@@ -161,13 +180,27 @@ class Window(tk.Tk):
                                              style='Switch',
                                              command=self.toggle_mode)
         self.delete_switch.grid(row=0, column=1, padx=5, pady=5, sticky='ew')
-        ################################################################################################################
-        # Create a log frame:
-        self.log_frame = ttk.LabelFrame(frame, text='Log:')
-        self.log_frame.grid(row=2, column=2, padx=5, pady=5, sticky='nsew')
 
-        self.entry_log = scrolledtext.ScrolledText(self.log_frame, height=7)
+        # Tạo frame thứ 3 thuộc frame thông tin:
+        self.log_frame = ttk.LabelFrame(self.thong_tin_frame, text='Log:')
+        self.log_frame.grid(row=0, column=2, padx=5, pady=5, sticky='ew')
+
+        self.entry_log = scrolledtext.ScrolledText(self.log_frame, height=5)
         self.entry_log.grid(row=0, column=0, padx=5, pady=5, sticky='ew')
+
+        ################################################################################################################
+        # Create a status frame:
+        self.status_frame = ttk.LabelFrame(frame, text='Trạng thái:')
+        self.status_frame.grid(row=3, column=0, padx=5, pady=5, sticky='ew')
+        self.status_frame.rowconfigure(3, weight=1)
+        self.status_frame.columnconfigure(0, weight=1)
+
+        self.lb_status = ttk.Label(self.status_frame)
+        self.lb_status.grid(row=1, column=0, padx=5, pady=5, sticky='e')
+
+        self.progress_bar = ttk.Progressbar(self.status_frame, length=1200)
+        self.progress_bar.grid(row=2, column=0, padx=5, pady=5, sticky='ew')
+
         ################################################################################################################
         # Create a tooltip:
         ToolTip(self.button_unzip, 'With an image file: \n'
@@ -392,7 +425,7 @@ class Window(tk.Tk):
                 so_db = len(list_db)
 
                 if so_db == 0:
-                    # Các dữ liệu tin nhắn không nằm trong nhiều các database hội thoại nữa mà chúng sẽ nằm trong
+                    # Các dữ liệu tin nhắn không nằm trong các database hội thoại nữa mà chúng sẽ nằm trong
                     # database chat.sqlite và chatgroup.sqlite:
                     path_chat_sqlite, path_chatgroup_sqlite = '', ''
                     for root, dirs, files in os.walk(path_full):
@@ -411,7 +444,7 @@ class Window(tk.Tk):
 
                     owner_name = Get_Data_iOS(df_danh_ba_tong, path_chat_sqlite, path_chatgroup_sqlite).get_owner_name()
                     number_of_message = len(df_final_1)
-                    self.zalo_owner_name.config(text=f'Tài khoản: {owner_name} có {number_of_message} tin nhắn')
+                    self.zalo_owner_name.insert(tk.END,f'Tài khoản: {owner_name} có {number_of_message} tin nhắn \n')
 
                 else:
                     df = ExtractZaloDB(df_danh_ba_tong, list_db).extract_data()
@@ -451,31 +484,23 @@ class Window(tk.Tk):
         contact_zalo = self.get_contact(danh_ba[0], danh_sach_bin_file)
         number_of_zalo = self.get_zalo_owner_info(zalo_path)
 
-        if number_of_zalo == 1:
-            db_list_1 = Scan_DB_files(owner_id_path[0]).scan_db()
-            so_db = len(db_list_1)
 
-            df_final_1 = self.get_data(contact_zalo, db_list_1)
-            df_final_1 = self.replace_receiver(df_final_1, owner_id[0])
-
-        elif number_of_zalo == 2:
-            db_list_1 = Scan_DB_files(owner_id_path[0]).scan_db()
-            db_list_2 = Scan_DB_files(owner_id_path[1]).scan_db()
-            so_db = len(db_list_1) + len(db_list_2)
-
-            df_final_1 = self.get_data(contact_zalo, db_list_1)
-            df_final_1 = self.replace_receiver(df_final_1, owner_id[0])
-
-            df_final_2 = self.get_data(contact_zalo, db_list_2)
-            df_final_2 = self.replace_receiver(df_final_2, owner_id[0])
-
-            df_final_1 = pd.concat([df_final_1, df_final_2], ignore_index=True)
-            df_final_1.index = np.arange(1, len(df_final_1) + 1)
-
-        elif number_of_zalo == 0:
+        if number_of_zalo == 0:
             df_final_1 = self.get_data_no_db(contact_zalo, danh_ba[0])
             df_final_1.index = np.arange(1, len(df_final_1) + 1)
             so_db = 1
+        else:
+            so_db = 0
+            df_final_1 = pd.DataFrame()
+            for i in range(number_of_zalo):
+                db_list = Scan_DB_files(owner_id_path[i]).scan_db()
+                so_db += len(db_list)
+                df_final_i = self.get_data(contact_zalo, db_list)
+                df_final_i = self.replace_receiver(df_final_i, owner_id[i])
+
+                df_final_1 = pd.concat([df_final_1, df_final_i], ignore_index=True)
+                df_final_1.index = np.arange(1, len(df_final_1) + 1)
+
 
         try:
             self.display_data(df_final_1)
@@ -493,7 +518,7 @@ class Window(tk.Tk):
         # Tìm tên chủ tài khoản Zalo:
         df_thong_tin_chu_tk = df_contact.loc[df_contact['SenderId'] == int(id_owner_zalo)]
         zalo_name_owner = df_thong_tin_chu_tk.iat[0, 1]
-        self.zalo_owner_name.config(text=f'{zalo_name_owner}')
+        self.zalo_owner_name.insert(tk.END,f'{zalo_name_owner} \n')
         self.zalo_owner_id.config(text=id_owner_zalo)
         return int(id_owner_zalo)
 
@@ -524,13 +549,16 @@ class Window(tk.Tk):
 
             # Tìm tên chủ tài khoản Zalo:
             df_tt_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'] == int(owner_id[0]))]
-            self.zalo_owner_name.config(text=f'- Tài khoản: {df_tt_chu_tk.iat[0, 1]}')
-
-        elif number_id == 1:
-            self.zalo_owner_id.config(text=f'{owner_id[0]}')
-
-        elif number_id == 2:
-            self.zalo_owner_id.config(text=f'{owner_id[0]}, {owner_id[1]}')
+            self.zalo_owner_name.insert(tk.END,f'- Tài khoản: {df_tt_chu_tk.iat[0, 1]} \n')
+        #
+        # elif number_id == 1:
+        #     self.zalo_owner_id.config(text=f'{owner_id[0]}')
+        #
+        # elif number_id == 2:
+        #     self.zalo_owner_id.config(text=f'{owner_id[0]}, {owner_id[1]}')
+        if number_id >= 1:
+            for i in range(number_id):
+                self.zalo_owner_id.config(text=f'{owner_id[i]} ')
 
         return number_id
 
@@ -730,7 +758,7 @@ class Window(tk.Tk):
         """
         do_dai = len(df)
         df_thong_tin_chu_tk = df_danh_ba_tong[(df_danh_ba_tong['SenderId'].astype(int) == int(id_chu_tk))]
-        self.zalo_owner_name.config(text=f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]} có {do_dai} tin nhắn.')
+        self.zalo_owner_name.insert(tk.END,f'- Tài khoản: {df_thong_tin_chu_tk.iat[0, 1]} có {do_dai} tin nhắn. \n')
 
         for i in range(do_dai):
             byte_data = df.iloc[i]['BinNet']
@@ -804,6 +832,11 @@ class Window(tk.Tk):
             shutil.copytree(media_path, new_path, dirs_exist_ok=True)
 
         if self.delete_switch.instate(['selected']):
+            # stat.S_IRUSR: owner read permission
+            # stat.S_IWUSR: owner write permission
+            # stat.S_IXUSR: owner excute permission
+
+            os.chmod(save_folder, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
             shutil.rmtree(save_folder)
         else:
             pass
@@ -819,7 +852,8 @@ class Window(tk.Tk):
         """
             Create a .docx report:
         """
-        document = MailMerge('Report.docx')
+        document = DocxTemplate('Report.docx')
+        # document = MailMerge('Report.docx')
         id_chu_tk = self.zalo_owner_id.cget('text')
         ten_chu_tk = self.zalo_owner_name.cget('text')
         document.merge(
